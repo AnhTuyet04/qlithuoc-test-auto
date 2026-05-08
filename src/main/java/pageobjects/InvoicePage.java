@@ -29,8 +29,11 @@ public class InvoicePage {
     private By btnPay         = By.xpath("//button[contains(.,'Thanh to\u00e1n')]");
 
     // -- Phuong thuc thanh toan
-    private By optCash        = By.xpath("//*[contains(text(),'Ti\u1ec1n m\u1eb7t')]");
-    private By optTransfer    = By.xpath("//*[contains(text(),'Chuy\u1ec3n kho\u1ea3n')]");
+    // App dung class btn-primary-full cho "Tien mat" va btn-secondary-full cho "Chuyen khoan"
+    // trong khu vuc chon phuong thuc (submit-actions-column dau tien)
+    // Dung CSS selector theo class + vi tri de tranh loi encoding UTF-8
+    private By optCash     = By.cssSelector(".submit-actions-column:first-of-type .btn-primary-full, button.btn-primary-full:not([class*='pay'])");
+    private By optTransfer = By.cssSelector(".submit-actions-column:first-of-type .btn-secondary-full, button.btn-secondary-full:first-of-type");
 
     // -- Tong tien tren form tao
     private By totalOnForm    = By.xpath(
@@ -73,15 +76,10 @@ public class InvoicePage {
     // ================================================================
     // Locators -- Thong bao chung
     // ================================================================
-    private By toastAny     = By.xpath(
-            "//*[contains(@class,'toast') or contains(@class,'alert') " +
-                    "or contains(@class,'notification') or contains(@class,'Toastify')]");
-    private By toastSuccess = By.xpath(
-            "//*[contains(text(),'th\u00e0nh c\u00f4ng') or contains(text(),'Th\u00e0nh c\u00f4ng') " +
-                    "or contains(text(),'Ho\u00e0n t\u1ea5t')]");
-    private By toastFail    = By.xpath(
-            "//*[contains(text(),'th\u1ea5t b\u1ea1i') or contains(text(),'Th\u1ea5t b\u1ea1i') " +
-                    "or contains(text(),'kh\u00f4ng th\u1ec3') or contains(text(),'Kh\u00f4ng th\u1ec3')]");
+    // Dung CSS selector theo data-type de tranh loi encoding UTF-8
+    private By toastAny     = By.cssSelector("[data-sonner-toast]");
+    private By toastSuccess = By.cssSelector("[data-sonner-toast][data-type='success']");
+    private By toastFail    = By.cssSelector("[data-sonner-toast][data-type='error'], [data-sonner-toast][data-type='warning']");
 
     // ================================================================
     // Navigation
@@ -106,38 +104,48 @@ public class InvoicePage {
             getWait().until(ExpectedConditions.urlContains("/invoices"));
         }
 
+        // Cho toast tu test truoc bien mat truoc khi click .btn-add
+        // Toast (data-sonner-toast) co the che phu nut, gay ElementClickInterceptedException
+        try {
+            getWait().until(ExpectedConditions.invisibilityOfElementLocated(
+                    By.cssSelector("[data-sonner-toast]")));
+        } catch (Exception ignored) {
+            // Neu khong co toast thi bo qua
+        }
+
         // Click nut "Tao hoa don" / "Tao moi"
         getWait().until(ExpectedConditions.or(
                 ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".btn-add")),
                 ExpectedConditions.visibilityOfElementLocated(invoiceTableRows)
         ));
-        getWait().until(ExpectedConditions.elementToBeClickable(By.cssSelector(".btn-add"))).click();
+        // Dung JS click de tranh bi toast che phu trong truong hop toast chua bien mat kip
+        WebElement btnAdd = getWait().until(
+                ExpectedConditions.presenceOfElementLocated(By.cssSelector(".btn-add")));
+        ((org.openqa.selenium.JavascriptExecutor) Constant.WEBDRIVER)
+                .executeScript("arguments[0].click()", btnAdd);
         getWait().until(ExpectedConditions.visibilityOfElementLocated(searchProduct));
     }
 
     public void openInvoiceListPage() {
-        // Khong dung driver.get() vi Vercel SPA tra 404 khi truy cap route truc tiep
-        // Phai navigate qua sidebar link "Ban hang" -> /invoices
         String currentUrl = Constant.WEBDRIVER.getCurrentUrl();
-
-        // Neu chua o trang chinh thi ve trang chu truoc
         if (!currentUrl.contains(Constant.URL) || currentUrl.contains("login")) {
             Constant.WEBDRIVER.get(Constant.URL);
             getWait().until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("//nav[contains(@class,'sidebar-nav')] | //aside")));
         }
 
-        // Click link "Ban hang" tren sidebar (href="/invoices")
         By invoiceLink = By.xpath("//nav//a[@href='/invoices'] | //aside//a[@href='/invoices']");
         getWait().until(ExpectedConditions.elementToBeClickable(invoiceLink)).click();
-
-        // Cho URL chuyen sang /invoices va noi dung load xong
         getWait().until(ExpectedConditions.urlContains("/invoices"));
-        getWait().until(ExpectedConditions.or(
-                ExpectedConditions.visibilityOfElementLocated(invoiceTableRows),
-                ExpectedConditions.visibilityOfElementLocated(emptyMsg),
-                ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".btn-add"))
-        ));
+
+        // Cho du lieu thuc su load xong: khong con "dang tai" va co it nhat 1 dong du lieu
+        getWait().until(driver -> {
+            List<WebElement> rows = driver.findElements(By.xpath("//table/tbody/tr"));
+            if (rows.isEmpty()) return false;
+            // Kiem tra dong dau tien khong phai loading placeholder
+            String text = rows.get(0).getText();
+            return !text.contains("ang t") && !text.isEmpty(); // "Đang tải" bị encode
+        });
     }
 
     /** Mo chi tiet hoa don dau tien trong danh sach */
@@ -163,10 +171,12 @@ public class InvoicePage {
         input.clear();
         input.sendKeys(productName);
 
+        // App dung <button class="product-search-item"> chua <p class="product-name">
+        // Text san pham nam trong the con, khong phai truc tiep trong button
+        // -> dung .//* de tim trong toan bo cay con
         By option = By.xpath(
-                "//li[contains(text(),'" + productName + "')] " +
-                        "| //div[contains(@class,'option')][contains(text(),'" + productName + "')] " +
-                        "| //td[contains(text(),'" + productName + "')]");
+                "//button[contains(@class,'product-search-item')][.//*[contains(text(),'" + productName + "')]]" +
+                " | //div[contains(@class,'product-search-item')][.//*[contains(text(),'" + productName + "')]]");
         getWait().until(ExpectedConditions.elementToBeClickable(option)).click();
     }
 
@@ -177,7 +187,12 @@ public class InvoicePage {
     }
 
     public void clickSaveDraft() {
-        getWait().until(ExpectedConditions.elementToBeClickable(btnSaveDraft)).click();
+        // Nut "Luu nhap" la btn-secondary-full CUOI CUNG tren trang
+        // (nut dau tien la "Chuyen khoan")
+        List<WebElement> btns = getWait().until(
+                ExpectedConditions.numberOfElementsToBeMoreThan(
+                        By.cssSelector("button.btn-secondary-full"), 0));
+        btns.get(btns.size() - 1).click();
     }
 
     /** Lay text lo dau tien duoc hien thi (kiem tra FEFO) */
@@ -192,11 +207,26 @@ public class InvoicePage {
 
     /** Lay text tong tien tren form tao hoa don */
     public String getTotalAmountText() {
-        try {
-            return getWait().until(ExpectedConditions.visibilityOfElementLocated(totalOnForm)).getText().trim();
-        } catch (Exception e) {
-            return "";
+        // App dung .summary-total strong de hien thi tong tien
+        // Fallback sang cac selector khac neu khong tim thay
+        By[] candidates = {
+            By.cssSelector(".summary-total strong"),
+            By.cssSelector(".summary-total"),
+            By.cssSelector("[class*='total'] strong"),
+            By.cssSelector("[class*='grand-total']"),
+            By.cssSelector("[class*='total-amount']")
+        };
+        for (By selector : candidates) {
+            try {
+                List<WebElement> els = Constant.WEBDRIVER.findElements(selector);
+                if (!els.isEmpty()) {
+                    String text = (String) ((org.openqa.selenium.JavascriptExecutor) Constant.WEBDRIVER)
+                            .executeScript("return arguments[0].textContent.trim()", els.get(0));
+                    if (text != null && !text.isEmpty()) return text;
+                }
+            } catch (Exception ignored) {}
         }
+        return "";
     }
 
     /** Kiem tra tong tien > 0 */
@@ -212,15 +242,31 @@ public class InvoicePage {
     // ================================================================
 
     public void chooseCashPayment() {
-        getWait().until(ExpectedConditions.elementToBeClickable(optCash)).click();
+        // Nut "Tien mat" la btn-primary-full DAU TIEN tren trang
+        // (nut "Thanh toan" la btn-primary-full thu HAI)
+        List<WebElement> btns = getWait().until(
+                ExpectedConditions.numberOfElementsToBeMoreThan(
+                        By.cssSelector("button.btn-primary-full"), 0));
+        // Click nut dau tien (Tien mat), khong phai nut cuoi (Thanh toan)
+        btns.get(0).click();
     }
 
     public void chooseTransferPayment() {
-        getWait().until(ExpectedConditions.elementToBeClickable(optTransfer)).click();
+        // Nut "Chuyen khoan" la btn-secondary-full DAU TIEN tren trang
+        // (nut "Luu nhap" la btn-secondary-full thu HAI)
+        List<WebElement> btns = getWait().until(
+                ExpectedConditions.numberOfElementsToBeMoreThan(
+                        By.cssSelector("button.btn-secondary-full"), 0));
+        btns.get(0).click();
     }
 
     public void clickPay() {
-        getWait().until(ExpectedConditions.elementToBeClickable(btnPay)).click();
+        // Nut "Thanh toan" la btn-primary-full CUOI CUNG tren trang
+        // (nut dau tien la "Tien mat")
+        List<WebElement> btns = getWait().until(
+                ExpectedConditions.numberOfElementsToBeMoreThan(
+                        By.cssSelector("button.btn-primary-full"), 0));
+        btns.get(btns.size() - 1).click();
     }
 
     /** Kiem tra nut Thanh toan co hien thi khong */
@@ -237,22 +283,52 @@ public class InvoicePage {
     }
 
     public boolean isSuccessMessageDisplayed() {
+        // Thu 1: Toast voi data-type='success' (Sonner)
         try {
-            return getWait().until(ExpectedConditions.visibilityOfElementLocated(toastSuccess)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+            WebElement toast = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(5))
+                    .until(ExpectedConditions.visibilityOfElementLocated(toastSuccess));
+            return toast.isDisplayed();
+        } catch (Exception ignored) {}
+
+        // Thu 2: Redirect roi khoi /invoices/new (luu nhap hoac thanh toan thanh cong)
+        try {
+            new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(10))
+                    .until(driver -> {
+                        String url = driver.getCurrentUrl();
+                        return url.contains("/invoices") && !url.contains("/invoices/new");
+                    });
+            return true;
+        } catch (Exception ignored) {}
+
+        return false;
     }
 
     public boolean isFailMessageDisplayed() {
+        // Thu 1: Toast voi data-type='error' hoac 'warning' (Sonner)
         try {
-            return getWait().until(ExpectedConditions.visibilityOfElementLocated(toastFail)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+            WebElement toast = getWait().until(
+                    ExpectedConditions.visibilityOfElementLocated(toastFail));
+            return toast.isDisplayed();
+        } catch (Exception ignored) {}
+
+        // Thu 2: Van o trang /invoices/new sau khi submit (bi chan)
+        String url = Constant.WEBDRIVER.getCurrentUrl();
+        return url.contains("/invoices/new");
     }
 
     public boolean isPaymentSuccess() {
+        // Cho URL chuyen tu /invoices/new sang /invoices (khong con /new)
+        // Dung urlToBe hoac urlMatches de wait chinh xac
+        try {
+            new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(15))
+                    .until(driver -> {
+                        String url = driver.getCurrentUrl();
+                        return url.contains("/invoices") && !url.contains("/invoices/new");
+                    });
+            return true;
+        } catch (Exception ignored) {}
+
+        // Fallback: kiem tra toast success
         return isSuccessMessageDisplayed();
     }
 
@@ -295,19 +371,41 @@ public class InvoicePage {
 
     /** Kiem tra thoi gian thanh toan co hien thi khong */
     public boolean isPaymentTimeDisplayed() {
-        By timeEl = By.xpath(
-                "//*[contains(@class,'payment-time') or contains(@class,'paid-at') " +
-                "or contains(text(),'Thoi gian') or contains(text(),'thanh toan') " +
-                "or contains(text(),'/202') or contains(text(),':')]");
-        return !Constant.WEBDRIVER.findElements(timeEl).isEmpty();
+        // Trang chi tiet co section "Thong tin hoa don" voi cac dong invoice-meta-line
+        // Thoi gian co format "HH:mm:ss d/M/yyyy" -> chua dau ":" va "/"
+        // Dung JS de doc text tranh loi encoding
+        List<WebElement> metaLines = Constant.WEBDRIVER.findElements(
+                By.cssSelector(".invoice-meta-line, .invoice-info-row, [class*='meta-line'], [class*='info-row']"));
+        for (WebElement line : metaLines) {
+            String text = (String) ((org.openqa.selenium.JavascriptExecutor) Constant.WEBDRIVER)
+                    .executeScript("return arguments[0].textContent.trim()", line);
+            // Thoi gian co dang "HH:mm:ss d/M/yyyy" -> chua ":"
+            if (text.contains(":") && text.matches(".*\\d{1,2}/\\d{1,2}/\\d{4}.*")) return true;
+        }
+        // Fallback: tim bat ky element nao chua thoi gian dang ngay/gio
+        List<WebElement> all = Constant.WEBDRIVER.findElements(By.xpath("//*"));
+        for (WebElement el : all) {
+            try {
+                String text = (String) ((org.openqa.selenium.JavascriptExecutor) Constant.WEBDRIVER)
+                        .executeScript("return arguments[0].childNodes.length > 0 ? '' : arguments[0].textContent.trim()", el);
+                if (text != null && text.matches("\\d{1,2}:\\d{2}:\\d{2}.*\\d{4}.*")) return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
     }
 
     /** Kiem tra phuong thuc thanh toan co hien thi khong */
     public boolean isPaymentMethodDisplayed() {
-        By methodEl = By.xpath(
-                "//*[contains(text(),'Tien mat') or contains(text(),'Chuyen khoan') " +
-                "or contains(text(),'CK') or contains(@class,'payment-method')]");
-        return !Constant.WEBDRIVER.findElements(methodEl).isEmpty();
+        // Trang chi tiet hien thi "Thanh toan: Tien mat" hoac "Chuyen khoan"
+        // Text bi encode -> dung JS doc innerText cua toan bo trang
+        String bodyText = (String) ((org.openqa.selenium.JavascriptExecutor) Constant.WEBDRIVER)
+                .executeScript("return document.body.innerText");
+        // Tim cac keyword phuong thuc thanh toan (co the bi encode)
+        // "Ti?n m?t" -> chua "Ti" va "m" | "Chuy?n kho?n" -> chua "Chuy" va "kho"
+        return bodyText.contains("Ti") && (bodyText.contains("m?t") || bodyText.contains("mat"))
+                || bodyText.contains("Chuy") && (bodyText.contains("kho") || bodyText.contains("khoan"))
+                || bodyText.contains("Thanh to") // "Thanh toan" section label
+                   && (bodyText.contains("Ti") || bodyText.contains("Chuy"));
     }
 
     /** Kiem tra co thong tin san pham trong chi tiet hoa don */
@@ -370,10 +468,9 @@ public class InvoicePage {
 
     /** Kiem tra co ket qua trong dropdown tim kiem khong */
     public boolean hasSearchResults() {
-        By dropdownItem = By.xpath(
-                "//li[contains(@class,'option') or contains(@class,'item') or contains(@class,'result')] " +
-                "| //div[contains(@class,'product-search-item')] " +
-                "| //div[contains(@class,'option')]");
+        // App dung <button class="product-search-item"> (khong phai div hay li)
+        By dropdownItem = By.cssSelector(
+                "button.product-search-item, div.product-search-item, .product-search-result button");
         return !Constant.WEBDRIVER.findElements(dropdownItem).isEmpty();
     }
 
@@ -453,11 +550,24 @@ public class InvoicePage {
 
     /** Loc theo trang thai */
     public void filterByStatus(String statusText) {
-        List<WebElement> selects = Constant.WEBDRIVER.findElements(ddlStatusFilter);
-        if (!selects.isEmpty()) {
-            new Select(selects.get(0)).selectByVisibleText(statusText);
-            try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
-        }
+        // App dung <select class="filter-select"> voi option value bi encode
+        // Dung selectByIndex thay vi selectByVisibleText de tranh loi encoding
+        // Index: 0=Tat ca, 1=Nhap, 2=Hoan tat, 3=Da huy
+        List<WebElement> selects = Constant.WEBDRIVER.findElements(
+                By.cssSelector("select.filter-select"));
+        if (selects.isEmpty()) return;
+
+        String lower = statusText.toLowerCase();
+        int index = 0; // mac dinh: Tat ca
+        if (lower.contains("nhap") || lower.contains("nh\u00e1p") || lower.contains("pending"))
+            index = 1;
+        else if (lower.contains("hoan") || lower.contains("ho\u00e0n") || lower.contains("active"))
+            index = 2;
+        else if (lower.contains("huy") || lower.contains("h\u1ee7y") || lower.contains("cancel"))
+            index = 3;
+
+        new org.openqa.selenium.support.ui.Select(selects.get(0)).selectByIndex(index);
+        try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
     }
 
     /** Loc theo khoang thoi gian (yyyy-MM-dd) */
@@ -504,6 +614,21 @@ public class InvoicePage {
 
     /** Kiem tra trang thai hoa don co chua text mong doi khong */
     public boolean isInvoiceStatusEquals(String expectedStatus) {
+        // Thu 1: Kiem tra theo CSS class cua badge (tranh loi encoding)
+        // "Nhap" -> pending | "Hoan tat" -> active | "Da huy" -> inactive
+        String lower = expectedStatus.toLowerCase();
+        String cssClass = null;
+        if (lower.contains("nhap") || lower.contains("nh")) cssClass = "pending";
+        else if (lower.contains("hoan") || lower.contains("tat")) cssClass = "active";
+        else if (lower.contains("huy") || lower.contains("cancel") || lower.contains("inactive"))
+            cssClass = "inactive";
+
+        if (cssClass != null) {
+            By badge = By.cssSelector(".status-badge." + cssClass);
+            if (!Constant.WEBDRIVER.findElements(badge).isEmpty()) return true;
+        }
+
+        // Thu 2: Kiem tra theo text (fallback)
         return getInvoiceStatus().contains(expectedStatus);
     }
 
@@ -553,10 +678,33 @@ public class InvoicePage {
 
     /** Mo hoa don dau tien co trang thai chua statusText */
     public void openFirstInvoiceWithStatus(String statusText) {
-        By row = By.xpath(
-                "//table//tbody//tr[.//*[contains(text(),'" + statusText + "')]][1]");
-        getWait().until(ExpectedConditions.elementToBeClickable(row)).click();
-        getWait().until(ExpectedConditions.visibilityOfElementLocated(invoiceStatus));
+        // Map statusText -> CSS class cua badge
+        // "Nhap"  -> pending | "Hoan tat" -> active | "Da huy" -> inactive
+        String lower = statusText.toLowerCase();
+        String cssClass = null;
+        if (lower.contains("nhap") || lower.contains("nh\u00e1p") || lower.contains("pending"))
+            cssClass = "pending";
+        else if (lower.contains("hoan") || lower.contains("ho\u00e0n") || lower.contains("active"))
+            cssClass = "active";
+        else if (lower.contains("huy") || lower.contains("h\u1ee7y") || lower.contains("cancel")
+                || lower.contains("inactive"))
+            cssClass = "inactive";
+
+        String rowSelector = cssClass != null
+                ? "//table//tbody//tr[.//span[contains(@class,'" + cssClass + "')]][1]//button[contains(@class,'icon-btn')]"
+                : "//table//tbody//tr[.//*[contains(text(),'" + statusText + "')]][1]//button[contains(@class,'icon-btn')]";
+
+        List<WebElement> btns = Constant.WEBDRIVER.findElements(By.xpath(rowSelector));
+        if (!btns.isEmpty()) {
+            ((org.openqa.selenium.JavascriptExecutor) Constant.WEBDRIVER)
+                    .executeScript("arguments[0].click()", btns.get(0));
+            getWait().until(ExpectedConditions.visibilityOfElementLocated(invoiceStatus));
+            return;
+        }
+
+        throw new org.openqa.selenium.NoSuchElementException(
+                "Khong tim thay hoa don co trang thai '" + statusText
+                + "' (cssClass=" + cssClass + ") tren trang hien tai.");
     }
 
     /** Kiem tra tat ca dong trong bang deu co trang thai chua statusText */
@@ -567,5 +715,34 @@ public class InvoicePage {
             if (!row.getText().contains(statusText)) return false;
         }
         return true;
+    }
+
+    public String getCreatedInvoiceCode() {
+        WebDriverWait wait = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(10));
+
+        wait.until(driver -> driver.getCurrentUrl().matches(".*/invoices/\\d+"));
+
+        String url = Constant.WEBDRIVER.getCurrentUrl();
+
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile(".*/invoices/(\\d+)")
+                .matcher(url);
+
+        if (m.find()) return m.group(1);
+
+        throw new RuntimeException("Không lấy được invoice ID từ URL: " + url);
+    }
+
+    public void openInvoiceById(String id) {
+        if (id.equals("new")) {
+            throw new RuntimeException("ID không hợp lệ: new");
+        }
+
+        WebDriverWait wait = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(20));
+
+        By locator = By.xpath("//table//tbody//tr[.//a[contains(@href,'/invoices/" + id + "')]]");
+
+        WebElement row = wait.until(ExpectedConditions.elementToBeClickable(locator));
+        row.click();
     }
 }

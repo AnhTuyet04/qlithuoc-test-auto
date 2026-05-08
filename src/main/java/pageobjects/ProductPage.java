@@ -1,72 +1,89 @@
 package pageobjects;
 
-import common.Constant;
+import java.time.Duration;
+import java.util.List;
+
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import java.time.Duration;
-import java.util.List;
+import common.Constant;
 
 public class ProductPage {
 
-    private WebDriverWait wait = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(15));
+    private WebDriver driver;
+    private WebDriverWait wait;
 
-    // ── Danh sách sản phẩm ──────────────────────────────────────────
-    private By btnAddProduct    = By.xpath("//button[contains(.,'Thêm sản phẩm') or contains(.,'Thêm mới')]");
+    private By menuProduct = By.xpath("//nav//a[contains(@href, '/products')]");
+
+    private By btnAddProduct = By.className("btn-add");
     private By productTableRows = By.xpath("//table//tbody//tr");
 
-    // ── Form thêm / sửa sản phẩm ────────────────────────────────────
-    private By txtProductName   = By.xpath("//input[@name='name' or @placeholder[contains(.,'tên') or contains(.,'Tên')]]");
-    private By txtContent       = By.xpath("//input[@name='content' or @name='hamluong' or @placeholder[contains(.,'hàm lượng') or contains(.,'Hàm lượng')]]");
-    private By txtUnit          = By.xpath("//input[@name='unit' or @name='donvi' or @placeholder[contains(.,'đơn vị') or contains(.,'Đơn vị')]]");
-    private By txtPrice         = By.xpath("//input[@name='price' or @name='giaban' or @type='number'][1]");
-    private By ddlGroup         = By.xpath("//select[@name='group' or @name='nhomthuoc'] | //div[contains(@class,'select')][contains(.,'Nhóm')]");
-    private By ddlStatus        = By.xpath("//select[@name='status' or @name='trangthai']");
-    private By btnSubmit        = By.xpath("//button[@type='submit' or contains(.,'Thêm mới') or contains(.,'Cập nhật')]");
-    private By btnCancel        = By.xpath("//button[contains(.,'Hủy')]");
+    private By btnEditFirst = By.cssSelector("table tbody tr:first-child .icon-btn");
 
-    // ── Thông báo kết quả ────────────────────────────────────────────
-    private By toastSuccess     = By.xpath("//*[contains(text(),'thành công')]");
-    private By toastFail        = By.xpath("//*[contains(text(),'thất bại') or contains(text(),'Thất bại')]");
-    private By toastAny         = By.xpath("//*[contains(@class,'toast') or contains(@class,'alert') or contains(@class,'message') or contains(@class,'notification')]");
-    private By validationMsg    = By.xpath("//*[contains(@class,'error') or contains(@class,'invalid') or contains(@class,'valid')]");
+    private By txtProductName = By.name("tenSanPham");
+    private By txtContent = By.name("hamLuong");
+    private By txtUnit = By.name("donViTinh");
+    private By txtPrice = By.name("giaBan");
+    private By ddlGroup = By.name("maNhom");
+    private By ddlStatus = By.name("trangThai");
+    private By btnSubmit = By.className("btn-save");
+    private By btnCancel = By.className("btn-cancel");
 
-    // ── Nút Sửa trong bảng ──────────────────────────────────────────
-    private By btnEditFirst     = By.xpath("(//button[contains(@title,'Sửa') or contains(.,'Sửa')] | //a[contains(@title,'Sửa')])[1]");
+    private By txtProductCode = By.xpath("//input[contains(@name,'maSanPham') or contains(@name,'productCode')]");
 
-    // ── Trường mã sản phẩm trong form sửa ───────────────────────────
-    private By txtProductCode   = By.xpath("//input[@name='code' or @name='masp' or @placeholder[contains(.,'mã') or contains(.,'Mã')]]");
+    private By toastSuccess = By.xpath("//*[contains(text(),'thành công') or contains(text(),'Thành công')]");
+    private By toastFail = By.xpath("//*[contains(text(),'thất bại') or contains(text(),'Thất bại') or contains(text(),'lỗi')]");
+    private By toastMessage = By.cssSelector("[data-sonner-toast], .toast-message, .alert");
+    private By validationMsg = By.cssSelector(".error-msg, .text-danger, .invalid-feedback, .error, .invalid");
 
-    // ================================================================
-    // Navigation
-    // ================================================================
+    private By firstRowProductName = By.cssSelector(
+            "table tbody tr:first-child td.td-name, table tbody tr:first-child td:nth-child(2)"
+    );
+
+    private By modalBox = By.className("modal-box");
+
+    public ProductPage(WebDriver driver) {
+        this.driver = driver;
+        this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+    }
 
     public void openProductPage() {
-        Constant.WEBDRIVER.get(Constant.URL + "/products");
+        String base = Constant.URL.replaceAll("/$", "");
+        driver.get(base + "/products");
+
+        wait.until(ExpectedConditions.urlContains("/products"));
+
+        wait.until(ExpectedConditions.or(
+                ExpectedConditions.visibilityOfElementLocated(btnAddProduct),
+                ExpectedConditions.visibilityOfElementLocated(productTableRows),
+                ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[contains(text(),'Quản lý sản phẩm')]"))
+        ));
+    }
+
+    public void navigateToProducts() {
+        wait.until(ExpectedConditions.elementToBeClickable(menuProduct)).click();
+
         wait.until(ExpectedConditions.or(
                 ExpectedConditions.visibilityOfElementLocated(btnAddProduct),
                 ExpectedConditions.visibilityOfElementLocated(productTableRows)
         ));
     }
 
-    // ================================================================
-    // Thêm sản phẩm
-    // ================================================================
-
     public void clickAddProduct() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnAddProduct)).click();
-        // Chờ form mở
+        closeToastIfExists();
+
+        WebElement btn = wait.until(ExpectedConditions.visibilityOfElementLocated(btnAddProduct));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", btn);
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", btn);
+
         wait.until(ExpectedConditions.visibilityOfElementLocated(txtProductName));
     }
 
-    /**
-     * Điền form thêm/sửa sản phẩm.
-     * Truyền null để bỏ trống trường đó.
-     */
     public void fillProductForm(String name, String content, String unit, String price, String status) {
         if (name != null) {
             WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(txtProductName));
@@ -75,11 +92,9 @@ public class ProductPage {
         }
 
         if (content != null) {
-            List<WebElement> els = Constant.WEBDRIVER.findElements(txtContent);
-            if (!els.isEmpty()) {
-                els.get(0).clear();
-                els.get(0).sendKeys(content);
-            }
+            WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(txtContent));
+            el.clear();
+            el.sendKeys(content);
         }
 
         if (unit != null) {
@@ -95,28 +110,61 @@ public class ProductPage {
         }
 
         if (status != null) {
-            List<WebElement> selects = Constant.WEBDRIVER.findElements(ddlStatus);
+            List<WebElement> selects = driver.findElements(ddlStatus);
             if (!selects.isEmpty()) {
                 new Select(selects.get(0)).selectByVisibleText(status);
             }
         }
     }
 
+    public void clickEditFirstProduct() {
+        closeToastIfExists();
+
+        WebElement btn = wait.until(ExpectedConditions.presenceOfElementLocated(btnEditFirst));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block:'center'});", btn);
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", btn);
+
+        wait.until(ExpectedConditions.visibilityOfElementLocated(txtProductName));
+    }
+
+    public void updateProductInfo(String name, String price) {
+        WebElement nameInput = wait.until(ExpectedConditions.visibilityOfElementLocated(txtProductName));
+        nameInput.clear();
+        if (name != null && !name.isEmpty()) {
+            nameInput.sendKeys(name);
+        }
+
+        WebElement priceInput = wait.until(ExpectedConditions.visibilityOfElementLocated(txtPrice));
+        priceInput.clear();
+        if (price != null && !price.isEmpty()) {
+            priceInput.sendKeys(price);
+        }
+    }
+
+    public void changeStatus(String statusText) {
+        WebElement selectElement = wait.until(ExpectedConditions.visibilityOfElementLocated(ddlStatus));
+        new Select(selectElement).selectByVisibleText(statusText);
+    }
+
     public void clickSubmit() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnSubmit)).click();
+        closeToastIfExists();
+
+        WebElement btn = wait.until(ExpectedConditions.presenceOfElementLocated(btnSubmit));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", btn);
     }
 
     public void clickCancel() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnCancel)).click();
+        WebElement btn = wait.until(ExpectedConditions.presenceOfElementLocated(btnCancel));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", btn);
     }
 
-    // ================================================================
-    // Kiểm tra kết quả
-    // ================================================================
-
-    /** Chờ và trả về text thông báo (toast / alert) */
     public String getToastMessage() {
-        return wait.until(ExpectedConditions.visibilityOfElementLocated(toastAny)).getText();
+        try {
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(5));
+            return shortWait.until(ExpectedConditions.visibilityOfElementLocated(toastMessage)).getText();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public boolean isSuccessMessageDisplayed() {
@@ -135,24 +183,36 @@ public class ProductPage {
         }
     }
 
-    /** Kiểm tra có thông báo validation (lỗi field) không */
     public boolean isValidationErrorDisplayed() {
         try {
-            // Ưu tiên HTML5 validation
-            WebElement nameField = Constant.WEBDRIVER.findElement(txtProductName);
-            if (!nameField.getAttribute("validity.valid").equals("true")) return true;
-        } catch (Exception ignored) {}
+            WebElement nameField = driver.findElement(txtProductName);
+            Object valid = ((JavascriptExecutor) driver)
+                    .executeScript("return arguments[0].validity.valid;", nameField);
+            if (Boolean.FALSE.equals(valid)) {
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
 
+        return !driver.findElements(validationMsg).isEmpty();
+    }
+
+    public boolean isInlineErrorDisplayed() {
+        return !driver.findElements(validationMsg).isEmpty();
+    }
+
+    public boolean isModalStillOpen() {
         try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(validationMsg)).isDisplayed();
+            Thread.sleep(1000);
+            List<WebElement> modals = driver.findElements(modalBox);
+            return !modals.isEmpty() && modals.get(0).isDisplayed();
         } catch (Exception e) {
             return false;
         }
     }
 
-    /** Kiểm tra sản phẩm vừa thêm có xuất hiện trong bảng không */
     public boolean isProductInTable(String productName) {
-        By row = By.xpath("//table//tbody//tr[.//*[contains(text(),'" + productName + "')]]");
+        By row = By.xpath("//table//tbody//tr[.//*[contains(text(),\"" + productName + "\")]]");
         try {
             return wait.until(ExpectedConditions.visibilityOfElementLocated(row)).isDisplayed();
         } catch (Exception e) {
@@ -160,61 +220,86 @@ public class ProductPage {
         }
     }
 
-    /** Lấy mã sản phẩm của dòng cuối cùng trong bảng (để kiểm tra tự sinh mã) */
     public String getLastProductCode() {
-        List<WebElement> rows = Constant.WEBDRIVER.findElements(productTableRows);
+        wait.until(driver -> {
+            List<WebElement> rows = driver.findElements(productTableRows);
+            if (rows.isEmpty()) return false;
+
+            String text = rows.get(0).getText();
+            return !text.contains("Đang tải");
+        });
+
+        List<WebElement> rows = driver.findElements(productTableRows);
         if (rows.isEmpty()) return "";
-        WebElement lastRow = rows.get(rows.size() - 1);
-        // Cột đầu tiên thường là mã sản phẩm
-        return lastRow.findElement(By.xpath(".//td[1]")).getText().trim();
+
+        return rows.get(rows.size() - 1)
+                .findElement(By.xpath(".//td[1]"))
+                .getText().trim();
     }
 
-    /** Kiểm tra vẫn đang ở trang danh sách sản phẩm (sau khi bấm Hủy) */
-    public boolean isOnProductListPage() {
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException ignored) {}
-        return Constant.WEBDRIVER.getCurrentUrl().contains("/products")
-                && Constant.WEBDRIVER.findElements(btnAddProduct).size() > 0;
+    public String getFirstProductNameInTable() {
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(firstRowProductName)).getText();
     }
 
-    // ================================================================
-    // Cập nhật sản phẩm
-    // ================================================================
-
-    /** Bấm nút Sửa của dòng đầu tiên trong bảng */
-    public void clickEditFirstProduct() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnEditFirst)).click();
-        wait.until(ExpectedConditions.visibilityOfElementLocated(txtProductName));
-    }
-
-    /** Kiểm tra trường mã sản phẩm có bị disabled / readonly không */
     public boolean isProductCodeFieldReadOnly() {
-        List<WebElement> codeFields = Constant.WEBDRIVER.findElements(txtProductCode);
-        if (codeFields.isEmpty()) return true; // không hiển thị trường mã → coi như không cho sửa
+        List<WebElement> codeFields = driver.findElements(txtProductCode);
+        if (codeFields.isEmpty()) {
+            return true;
+        }
+
         WebElement field = codeFields.get(0);
         return field.getAttribute("disabled") != null
                 || field.getAttribute("readonly") != null
                 || !field.isEnabled();
     }
 
-    /** Xóa nội dung trường tên sản phẩm */
+    public boolean isProductCodeEditable() {
+        List<WebElement> codeInputs = driver.findElements(txtProductCode);
+        if (codeInputs.isEmpty()) {
+            return false;
+        }
+
+        WebElement field = codeInputs.get(0);
+        return field.isEnabled() && field.getAttribute("readonly") == null;
+    }
+
     public void clearProductName() {
         WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(txtProductName));
         el.clear();
-        // Một số framework cần JS để trigger change event
-        ((JavascriptExecutor) Constant.WEBDRIVER).executeScript("arguments[0].value='';", el);
+        ((JavascriptExecutor) driver).executeScript("arguments[0].value='';", el);
     }
 
-    /** Lấy giá trị mặc định của dropdown Trạng thái */
     public String getDefaultStatus() {
-        List<WebElement> selects = Constant.WEBDRIVER.findElements(ddlStatus);
+        List<WebElement> selects = driver.findElements(ddlStatus);
         if (!selects.isEmpty()) {
             return new Select(selects.get(0)).getFirstSelectedOption().getText().trim();
         }
-        // Nếu không phải select tag, tìm text hiển thị
-        List<WebElement> statusTexts = Constant.WEBDRIVER.findElements(
-                By.xpath("//*[contains(@class,'status') or contains(@class,'trangthai')][1]"));
+
+        List<WebElement> statusTexts = driver.findElements(
+                By.xpath("//*[contains(@class,'status') or contains(@class,'trangthai')][1]")
+        );
         return statusTexts.isEmpty() ? "" : statusTexts.get(0).getText().trim();
+    }
+
+    public boolean isOnProductListPage() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException ignored) {
+        }
+
+        return driver.getCurrentUrl().contains("/products")
+                && !driver.findElements(btnAddProduct).isEmpty();
+    }
+
+    private void closeToastIfExists() {
+        try {
+            List<WebElement> toasts = driver.findElements(By.cssSelector("[data-sonner-toast]"));
+            if (!toasts.isEmpty()) {
+                ((JavascriptExecutor) driver).executeScript(
+                        "document.querySelectorAll('[data-sonner-toast]').forEach(e => e.remove());"
+                );
+            }
+        } catch (Exception ignored) {
+        }
     }
 }

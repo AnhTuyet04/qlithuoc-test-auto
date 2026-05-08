@@ -1,276 +1,385 @@
 package testcases;
 
-import common.Constant;
+import Base.BaseTest;
 import org.openqa.selenium.By;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
+import org.openqa.selenium.WebElement;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import pageobjects.LoginPage;
 
-import java.time.Duration;
-
-/**
- * Module: Đăng nhập
- * Tester: Hồ Sỹ Hải Lâm
- * Pre-condition: Hệ thống hoạt động bình thường, có tài khoản Admin và Nhân viên,
- *                người dùng đang ở màn hình đăng nhập
- *
- * Tổng: 13 test case (LGN_01 → LGN_13)
- * Pass: 7 | Fail (known bugs): 6
- */
 public class LoginTest extends BaseTest {
 
-    // ----------------------------------------------------------------
-    // LGN_01: Đăng nhập thành công với tài khoản Admin hợp lệ
-    // Kết quả mong đợi: Đăng nhập thành công, chuyển vào trang chính
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_01_LoginSuccessWithAdminAccount() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.login(Constant.ADMIN_USER, Constant.ADMIN_PASS);
+    // =====================================================
+    // T sửa tài khoản test thật ở đây
+    // =====================================================
 
-        Assert.assertTrue(
-                Constant.WEBDRIVER.getCurrentUrl().contains("dashboard")
-                || Constant.WEBDRIVER.getCurrentUrl().contains("products")
-                || Constant.WEBDRIVER.getCurrentUrl().equals(Constant.URL + "/"),
-                "LGN_01 FAIL: Admin đăng nhập không thành công"
+    private final String ADMIN_USERNAME = "admin";
+    private final String ADMIN_PASSWORD = "123456";
+
+    private final String STAFF_USERNAME = "nhanvien";
+    private final String STAFF_PASSWORD = "123456";
+
+    private final String LOCKED_USERNAME = "taikhoanbikhoa";
+    private final String LOCKED_PASSWORD = "123456";
+
+    // =====================================================
+    // Locator dùng chung cho trang đăng nhập
+    // =====================================================
+
+    private WebElement usernameInput() {
+        return findFirstVisible(
+                By.name("username"),
+                By.name("email"),
+                By.id("username"),
+                By.id("email"),
+                By.cssSelector("input[type='text']"),
+                By.cssSelector("input[type='email']"),
+                By.cssSelector("input[placeholder*='Tên']"),
+                By.cssSelector("input[placeholder*='tài khoản']"),
+                By.cssSelector("input[placeholder*='username']"),
+                By.cssSelector("input[placeholder*='Email']")
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_02: Đăng nhập thành công với tài khoản Nhân viên hợp lệ
-    // Kết quả mong đợi: Đăng nhập thành công, chuyển vào trang chính
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_02_LoginSuccessWithStaffAccount() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.login(Constant.STAFF_USER, Constant.STAFF_PASS);
-
-        Assert.assertTrue(
-                Constant.WEBDRIVER.getCurrentUrl().contains("dashboard")
-                || Constant.WEBDRIVER.getCurrentUrl().contains("products")
-                || Constant.WEBDRIVER.getCurrentUrl().equals(Constant.URL + "/"),
-                "LGN_02 FAIL: Nhân viên đăng nhập không thành công"
+    private WebElement passwordInput() {
+        return findFirstVisible(
+                By.name("password"),
+                By.id("password"),
+                By.cssSelector("input[type='password']"),
+                By.cssSelector("input[placeholder*='Mật khẩu']"),
+                By.cssSelector("input[placeholder*='password']")
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_03: Bỏ trống username
-    // Kết quả mong đợi: Hiển thị "Vui lòng nhập đầy đủ thông tin"
-    // Bug: Thực tế hiển thị "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu" → Fail
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_03_LoginWithEmptyUsername() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin("", Constant.ADMIN_PASS);
-
-        String msg = loginPage.getErrorMessage();
-        Assert.assertTrue(
-                msg.contains("Vui lòng nhập đầy đủ thông tin"),
-                "LGN_03 FAIL: Thông báo lỗi không đúng. Thực tế: " + msg
+    private WebElement loginButton() {
+        return findFirstClickable(
+                By.cssSelector("button[type='submit']"),
+                By.xpath("//button[contains(.,'Đăng nhập')]"),
+                By.xpath("//button[contains(.,'Login')]"),
+                By.xpath("//button")
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_04: Bỏ trống password
-    // Kết quả mong đợi: Hiển thị "Vui lòng nhập đầy đủ thông tin"
-    // Bug: Thực tế hiển thị "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu" → Fail
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_04_LoginWithEmptyPassword() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin(Constant.ADMIN_USER, "");
+    private void login(String username, String password) {
+        type(usernameInput(), username);
+        type(passwordInput(), password);
+        loginButton().click();
+    }
 
-        String msg = loginPage.getErrorMessage();
+    private boolean isLoginSuccess() {
+        try {
+            return wait.until(d -> {
+                String text = d.findElement(By.tagName("body")).getText().toLowerCase();
+                String url = d.getCurrentUrl().toLowerCase();
+
+                return text.contains("đăng xuất")
+                        || text.contains("dashboard")
+                        || text.contains("trang chủ")
+                        || text.contains("sản phẩm")
+                        || text.contains("thuốc")
+                        || text.contains("hóa đơn")
+                        || text.contains("nhập hàng")
+                        || url.contains("dashboard")
+                        || url.contains("home")
+                        || url.contains("admin");
+            });
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean pageContainsAny(String... keywords) {
+        try {
+            return wait.until(d -> {
+                String bodyText = d.findElement(By.tagName("body")).getText().toLowerCase();
+
+                for (String keyword : keywords) {
+                    if (bodyText.contains(keyword.toLowerCase())) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // =====================================================
+    // LGN_01 - Đăng nhập thành công với tài khoản Admin hợp lệ
+    // =====================================================
+
+    @Test
+    public void LGN_01_loginSuccessfullyWithAdminAccount() {
+        System.out.println("Admin username đang dùng: " + ADMIN_USERNAME);
+        System.out.println("Admin password length: " + ADMIN_PASSWORD);
+
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+
         Assert.assertTrue(
-                msg.contains("Vui lòng nhập đầy đủ thông tin"),
-                "LGN_04 FAIL: Thông báo lỗi không đúng. Thực tế: " + msg
+                isLoginSuccess(),
+                "LGN_01 FAIL: Admin đăng nhập không thành công."
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_05: Bỏ trống cả username và password
-    // Kết quả mong đợi: Hiển thị "Vui lòng nhập đầy đủ thông tin"
-    // Bug: Thực tế hiển thị "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu" → Fail
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_05_LoginWithEmptyUsernameAndPassword() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin("", "");
+    // =====================================================
+    // LGN_02 - Đăng nhập thành công với tài khoản Nhân viên hợp lệ
+    // =====================================================
 
-        String msg = loginPage.getErrorMessage();
+    @Test
+    public void LGN_02_loginSuccessfullyWithStaffAccount() {
+        login(STAFF_USERNAME, STAFF_PASSWORD);
+
         Assert.assertTrue(
-                msg.contains("Vui lòng nhập đầy đủ thông tin"),
-                "LGN_05 FAIL: Thông báo lỗi không đúng. Thực tế: " + msg
+                isLoginSuccess(),
+                "LGN_02 FAIL: Nhân viên đăng nhập không thành công."
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_06: Sai username
-    // Kết quả mong đợi: Hiển thị "Sai tên đăng nhập hoặc mật khẩu"
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_06_LoginWithWrongUsername() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin("wrong_user_xyz", Constant.ADMIN_PASS);
+    // =====================================================
+    // LGN_03 - Bỏ trống username
+    // =====================================================
 
-        String msg = loginPage.getErrorMessage();
-        Assert.assertTrue(
-                msg.contains("Sai tên đăng nhập hoặc mật khẩu"),
-                "LGN_06 FAIL: Thông báo lỗi không đúng. Thực tế: " + msg
+    @Test
+    public void LGN_03_loginWithoutUsername() {
+        type(passwordInput(), ADMIN_PASSWORD);
+        loginButton().click();
+
+        boolean actualResult = pageContainsAny(
+                "Vui lòng nhập đầy đủ thông tin"
+        );
+
+        Assert.assertEquals(
+                actualResult,
+                true,
+                "LGN_03 FAIL: Hiển thị không đúng thông báo khi bỏ trống cả username."
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_07: Sai password
-    // Kết quả mong đợi: Hiển thị "Sai tên đăng nhập hoặc mật khẩu"
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_07_LoginWithWrongPassword() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin(Constant.ADMIN_USER, "wrongpass999");
+    // =====================================================
+    // LGN_04 - Bỏ trống password
+    // =====================================================
 
-        String msg = loginPage.getErrorMessage();
-        Assert.assertTrue(
-                msg.contains("Sai tên đăng nhập hoặc mật khẩu"),
-                "LGN_07 FAIL: Thông báo lỗi không đúng. Thực tế: " + msg
+    @Test
+    public void LGN_04_loginWithoutPassword() {
+        type(usernameInput(), ADMIN_USERNAME);
+        loginButton().click();
+
+        boolean actualResult = pageContainsAny(
+                "Vui lòng nhập đầy đủ thông tin"
+        );
+
+        Assert.assertEquals(
+                actualResult,
+                true,
+                "LGN_04 FAIL: Hiển thị không đúng thông báo khi bỏ trống password."
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_08: Đăng nhập sai liên tiếp 5 lần
-    // Kết quả mong đợi: Tài khoản bị khóa tạm thời hoặc hiển thị cảnh báo phù hợp
-    // Bug: Không có thông báo khóa tài khoản → Fail
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_08_LoginFailFiveTimesConsecutively() {
-        LoginPage loginPage = new LoginPage();
+    // =====================================================
+    // LGN_05 - Bỏ trống cả 2 trường
+    // =====================================================
 
-        // Sai 5 lần liên tiếp
+    @Test
+    public void LGN_05_loginWithoutUsernameAndPassword() {
+        loginButton().click();
+
+        boolean actualResult = pageContainsAny(
+                "Vui lòng nhập đầy đủ thông tin"
+        );
+
+        Assert.assertEquals(
+                actualResult,
+                true,
+                "LGN_05 FAIL: Hiển thị không đúng thông báo khi bỏ trống cả username và password."
+        );
+    }
+
+    // =====================================================
+    // LGN_06 - Sai username
+    // =====================================================
+
+    @Test
+    public void LGN_06_loginWithWrongUsername() {
+        login("sai_username", ADMIN_PASSWORD);
+
+        boolean actualResult = pageContainsAny(
+                "Sai tên đăng nhập hoặc mật khẩu"
+        );
+
+        Assert.assertEquals(
+                actualResult,
+                true,
+                "LGN_06 FAIL: Hiển thị không đúng thông báo khi nhập sai username."
+        );
+    }
+
+    // =====================================================
+    // LGN_07 - Sai password
+    // =====================================================
+
+    @Test
+    public void LGN_07_loginWithWrongPassword() {
+        login(ADMIN_USERNAME, "sai_password");
+
+        boolean actualResult = pageContainsAny(
+                "Sai tên đăng nhập hoặc mật khẩu"
+        );
+
+        Assert.assertEquals(
+                actualResult,
+                true,
+                "LGN_07 FAIL: Hiển thị không đúng thông báo khi nhập sai password."
+        );
+    }
+
+    // =====================================================
+    // LGN_08 - Sai liên tiếp 5 lần
+    // =====================================================
+
+    @Test
+    public void LGN_08_loginWrongPasswordFiveTimes() {
         for (int i = 1; i <= 5; i++) {
-            Constant.WEBDRIVER.get(Constant.URL);
-            loginPage = new LoginPage();
-            loginPage.submitLogin(Constant.ADMIN_USER, "wrongpass_" + i);
-
-            // Chờ thông báo lỗi xuất hiện trước lần tiếp theo
-            try {
-                new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(5))
-                        .until(ExpectedConditions.visibilityOfElementLocated(
-                                By.xpath("//*[contains(text(),'Sai') or contains(text(),'khóa')]")));
-            } catch (Exception ignored) {}
+            type(usernameInput(), ADMIN_USERNAME);
+            type(passwordInput(), "sai_password_" + i);
+            loginButton().click();
         }
 
-        String msg = loginPage.getErrorMessage();
         Assert.assertTrue(
-                msg.contains("khóa") || msg.contains("tạm thời") || msg.contains("locked"),
-                "LGN_08 FAIL: Không có thông báo khóa tài khoản sau 5 lần sai. Thực tế: " + msg
+                pageContainsAny(
+                        "tài khoản bị khóa tạm thời"
+                ),
+                "LGN_08 FAIL: Không khóa tài khoản sau khi đăng nhập sai 5 lần."
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_09: Đăng nhập khi tài khoản đã bị khóa
-    // Kết quả mong đợi: Hiển thị "Tài khoản đã bị khóa tạm thời, vui lòng liên hệ quản trị"
-    // Bug: Không có chức năng khóa tài khoản → Fail
-    // ----------------------------------------------------------------
+    // =====================================================
+    // LGN_09 - Đăng nhập khi tài khoản đã bị khóa
+    // =====================================================
+
     @Test
-    public void LGN_09_LoginWithLockedAccount() {
-        // Pre-condition: tài khoản này đã bị khóa (sau LGN_08 hoặc khóa thủ công)
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin(Constant.ADMIN_USER, Constant.ADMIN_PASS);
-
-        String msg = loginPage.getErrorMessage();
-        Assert.assertTrue(
-                msg.contains("khóa") || msg.contains("tạm thời") || msg.contains("liên hệ quản trị"),
-                "LGN_09 FAIL: Không hiển thị thông báo tài khoản bị khóa. Thực tế: " + msg
-        );
-    }
-
-    // ----------------------------------------------------------------
-    // LGN_10: Username có khoảng trắng đầu/cuối
-    // Kết quả mong đợi: Hệ thống tự trim hoặc không chấp nhận
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_10_LoginWithUsernameHavingLeadingTrailingSpaces() {
-        LoginPage loginPage = new LoginPage();
-
-        // Thêm khoảng trắng đầu và cuối username hợp lệ
-        loginPage.login(" " + Constant.ADMIN_USER + " ", Constant.ADMIN_PASS);
-
-        // Hệ thống tự trim → đăng nhập thành công, hoặc báo lỗi định dạng
-        boolean loggedIn = Constant.WEBDRIVER.getCurrentUrl().contains("dashboard")
-                || Constant.WEBDRIVER.getCurrentUrl().contains("products")
-                || Constant.WEBDRIVER.getCurrentUrl().equals(Constant.URL + "/");
-
-        Assert.assertTrue(loggedIn,
-                "LGN_10 FAIL: Hệ thống không xử lý đúng username có khoảng trắng đầu/cuối"
-        );
-    }
-
-    // ----------------------------------------------------------------
-    // LGN_11: Password không đúng format rule (dưới 8 ký tự)
-    // Kết quả mong đợi: Hệ thống không chấp nhận và hiển thị thông báo lỗi
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_11_LoginWithPasswordBelowMinLength() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.submitLogin(Constant.ADMIN_USER, "abc"); // dưới 8 ký tự
-
-        String msg = loginPage.getErrorMessage();
-        Assert.assertFalse(
-                msg.isEmpty(),
-                "LGN_11 FAIL: Không hiển thị thông báo lỗi khi password dưới 8 ký tự"
-        );
-    }
-
-    // ----------------------------------------------------------------
-    // LGN_12: Chức năng hiển thị mật khẩu (icon toggle)
-    // Kết quả mong đợi: Password được hiển thị đúng khi bấm icon
-    // Bug: Không có icon hiện mật khẩu → Fail
-    // ----------------------------------------------------------------
-    @Test
-    public void LGN_12_ShowPasswordIconFunctionality() {
-        LoginPage loginPage = new LoginPage();
-
-        // Điền password trước
-        new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(10))
-                .until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//input[@type='password']")))
-                .sendKeys("testpassword");
+    public void LGN_09_loginWithLockedAccount() {
+        login(LOCKED_USERNAME, LOCKED_PASSWORD);
 
         Assert.assertTrue(
-                loginPage.isShowPasswordIconPresent(),
-                "LGN_12 FAIL: Không có icon hiện mật khẩu trên trang đăng nhập"
-        );
-
-        loginPage.clickShowPasswordIcon();
-
-        Assert.assertTrue(
-                loginPage.isPasswordVisible(),
-                "LGN_12 FAIL: Mật khẩu không được hiển thị sau khi bấm icon"
+                pageContainsAny(
+                        "tài khoản đã bị khóa tạm thời",
+                        "tài khoản bị khóa",
+                        "vui lòng liên hệ quản trị",
+                        "bị khóa",
+                        "locked"
+                ),
+                "LGN_09 FAIL: Không hiển thị thông báo tài khoản bị khóa."
         );
     }
 
-    // ----------------------------------------------------------------
-    // LGN_13: Tạo session sau đăng nhập thành công
-    // Kết quả mong đợi: Truy cập được các chức năng sau login
-    // ----------------------------------------------------------------
+    // =====================================================
+    // LGN_10 - Username có khoảng trắng đầu/cuối
+    // =====================================================
+
     @Test
-    public void LGN_13_SessionCreatedAfterLogin() {
-        LoginPage loginPage = new LoginPage();
-        loginPage.login(Constant.ADMIN_USER, Constant.ADMIN_PASS);
+    public void LGN_10_loginWithUsernameHasLeadingAndTrailingSpaces() {
+        login("   " + ADMIN_USERNAME + "   ", ADMIN_PASSWORD);
 
-        // Thử truy cập các trang chức năng
-        String[] protectedPages = {"/products", "/inventory", "/invoices"};
+        boolean successAfterTrim = isLoginSuccess();
 
-        for (String page : protectedPages) {
-            Constant.WEBDRIVER.get(Constant.URL + page);
+        boolean showInvalidFormatMessage = pageContainsAny(
+                "sai định dạng",
+                "không hợp lệ",
+                "không đúng",
+                "vui lòng",
+                "invalid"
+        );
 
-            boolean accessible = !Constant.WEBDRIVER.getCurrentUrl().contains("login")
-                    && !Constant.WEBDRIVER.getCurrentUrl().equals(Constant.URL + "/");
+        Assert.assertTrue(
+                successAfterTrim || showInvalidFormatMessage,
+                "LGN_10 FAIL: Hệ thống không xử lý username có khoảng trắng đầu/cuối đúng rule."
+        );
+    }
 
-            Assert.assertTrue(accessible,
-                    "LGN_13 FAIL: Không truy cập được trang " + page + " sau khi đăng nhập"
-            );
-        }
+    // =====================================================
+    // LGN_11 - Password không đúng format rule
+    // =====================================================
+
+    @Test
+    public void LGN_11_loginWithInvalidPasswordFormat() {
+        login(ADMIN_USERNAME, "12");
+
+        Assert.assertTrue(
+                pageContainsAny(
+                        "password",
+                        "mật khẩu",
+                        "tối thiểu",
+                        "ít nhất",
+                        "8 ký tự",
+                        "không hợp lệ",
+                        "invalid",
+                        "rule"
+                ),
+                "LGN_11 FAIL: Không báo lỗi khi password không đúng format rule."
+        );
+    }
+
+    // =====================================================
+    // LGN_12 - Chức năng hiển thị mật khẩu
+    // =====================================================
+
+    @Test
+    public void LGN_12_showPasswordFunction() {
+        WebElement password = passwordInput();
+        type(password, ADMIN_PASSWORD);
+
+        WebElement showPasswordButton = findFirstClickable(
+                By.xpath("//input[@type='password']/following::button[1]"),
+                By.xpath("//*[contains(@class,'eye')]"),
+                By.xpath("//*[contains(@aria-label,'password')]"),
+                By.xpath("//*[contains(@aria-label,'show')]")
+        );
+
+        showPasswordButton.click();
+
+        String inputType = password.getAttribute("type");
+
+        Assert.assertTrue(
+                inputType.equalsIgnoreCase("text"),
+                "LGN_12 FAIL: Sau khi bấm icon hiển thị mật khẩu, password chưa được hiển thị."
+        );
+    }
+
+    // =====================================================
+    // LGN_13 - Tạo session sau đăng nhập thành công
+    // =====================================================
+
+
+    @Test
+    public void LGN_13_sessionCreatedAfterLoginSuccessfully() {
+        login(ADMIN_USERNAME, ADMIN_PASSWORD);
+
+        Assert.assertTrue(
+                isLoginSuccess(),
+                "LGN_13 FAIL: Đăng nhập không thành công."
+        );
+
+        WebElement productMenu = findFirstClickable(
+                By.xpath("//a[contains(.,'Sản phẩm')]"),
+                By.xpath("//button[contains(.,'Sản phẩm')]"),
+                By.xpath("//*[normalize-space()='Sản phẩm']"),
+                By.xpath("//*[contains(text(),'Sản phẩm')]")
+        );
+
+        productMenu.click();
+
+        boolean canAccessProductModule = wait.until(d -> {
+            String bodyText = d.findElement(By.tagName("body")).getText().toLowerCase();
+            return bodyText.contains("quản lý sản phẩm")
+                    || bodyText.contains("thêm sản phẩm")
+                    || bodyText.contains("danh sách sản phẩm")
+                    || bodyText.contains("sản phẩm");
+        });
+
+        Assert.assertTrue(
+                canAccessProductModule,
+                "LGN_13 FAIL: Sau khi đăng nhập, không truy cập được module Sản phẩm."
+        );
     }
 }

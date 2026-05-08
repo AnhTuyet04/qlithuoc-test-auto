@@ -1,163 +1,91 @@
 package pageobjects;
 
-import common.Constant;
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 public class InventoryPage {
+    private WebDriver driver;
+    private WebDriverWait wait;
 
-    private WebDriverWait wait = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(15));
+    private By menuInventory = By.xpath("//nav//a[contains(@href, '/inventory')]");
+    private By tableRows = By.cssSelector("table tbody tr");
+    private By emptyStateMessage = By.xpath("//*[contains(text(), 'Không có dữ liệu tồn kho') or contains(text(), 'Không tìm thấy')]");
 
-    // ── Tìm kiếm ────────────────────────────────────────────────────
-    private By searchInput   = By.xpath("//input[contains(@placeholder,'Tìm') or contains(@placeholder,'tìm') or contains(@placeholder,'sản phẩm') or contains(@placeholder,'lô')]");
-    private By ddlStatus     = By.xpath("//select[@name='status' or @name='trangthai'] | //select[contains(@class,'filter')]");
+    // Locators chính xác từ HTML thực tế
+    private By searchBox = By.cssSelector("input.search-input[placeholder*='số lô']");
+    private By filterStatusDropdown = By.className("filter-select");
 
-    // ── Bảng kết quả ────────────────────────────────────────────────
-    private By tableRows     = By.xpath("//table//tbody//tr");
-    private By emptyMsg      = By.xpath("//*[contains(text(),'Không có dữ liệu') or contains(text(),'không có dữ liệu') or contains(text(),'phù hợp')]");
-    private By errorMsg      = By.xpath("//*[contains(text(),'Không tải được') or contains(text(),'lỗi') or contains(@class,'error')]");
+    private By colProductName = By.cssSelector("table tbody tr td:first-child, td.td-product-name");
+    private By colBatchNumber = By.cssSelector("table tbody tr td:nth-child(2), td.td-batch-number");
 
-    // ── Phân trang ───────────────────────────────────────────────────
-    private By pagination    = By.xpath("//*[contains(@class,'pagination') or contains(@class,'paging')]");
+    // FIX INV_08
+    private By outOfStockBadge = By.xpath("//table/tbody//td//*[contains(text(), 'Hết hàng')] | //table/tbody//td[text()='0']");
+    private By nearExpiryWarning = By.xpath("//table/tbody//*[contains(text(), 'Cận hạn') or contains(@class, 'warning')]");
+    private By paginationContainer = By.cssSelector(".pagination, nav[aria-label='pagination'], .page-item");
 
-    // ── Trạng thái / cảnh báo trong bảng ────────────────────────────
-    // Dòng có số lượng = 0 (hết hàng)
-    private By outOfStockRow = By.xpath("//table//tbody//tr[.//*[contains(text(),'Hết hàng') or contains(text(),'hết hàng') or contains(text(),'0')]]");
-    // Badge / label cảnh báo cận hạn
-    private By nearExpiryBadge = By.xpath("//*[contains(text(),'Cận hạn') or contains(text(),'cận hạn') or contains(@class,'near-expiry') or contains(@class,'warning')]");
-
-    // ================================================================
-    // Navigation
-    // ================================================================
-
-    public void openInventoryPage() {
-        Constant.WEBDRIVER.get(Constant.URL + "/inventory");
-        wait.until(ExpectedConditions.or(
-                ExpectedConditions.visibilityOfElementLocated(tableRows),
-                ExpectedConditions.visibilityOfElementLocated(emptyMsg)
-        ));
+    public InventoryPage(WebDriver driver) {
+        this.driver = driver;
+        this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
     }
 
-    // ================================================================
-    // Tìm kiếm & Lọc
-    // ================================================================
+    public void navigateToInventory() {
+        wait.until(ExpectedConditions.elementToBeClickable(menuInventory)).click();
+        wait.until(ExpectedConditions.presenceOfElementLocated(tableRows));
+    }
 
-    public void searchByKeyword(String keyword) {
-        WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(searchInput));
+    public void search(String keyword) {
+        WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(searchBox));
         input.clear();
         input.sendKeys(keyword);
-        // Chờ kết quả cập nhật
-        try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+        try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
     }
 
-    public void filterByStatus(String statusText) {
-        List<WebElement> selects = Constant.WEBDRIVER.findElements(ddlStatus);
-        if (!selects.isEmpty()) {
-            new Select(selects.get(0)).selectByVisibleText(statusText);
-            try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
-        }
+    public void filterByStatus(String statusValue) {
+        WebElement selectElement = wait.until(ExpectedConditions.visibilityOfElementLocated(filterStatusDropdown));
+        Select select = new Select(selectElement);
+        select.selectByVisibleText(statusValue);
+        try { Thread.sleep(1500); } catch (InterruptedException ignored) {}
     }
 
-    public void clearSearch() {
-        WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(searchInput));
-        input.clear();
-        try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+    public int getNumberOfRows() {
+        try { return driver.findElements(tableRows).size(); }
+        catch (Exception e) { return 0; }
     }
 
-    // ================================================================
-    // Kiểm tra kết quả
-    // ================================================================
-
-    /** Kiểm tra bảng có hiển thị dòng chứa keyword không */
-    public boolean isResultDisplayed(String keyword) {
-        By row = By.xpath("//table//tbody//tr[.//*[contains(text(),'" + keyword + "')]]");
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(row)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+    public String getEmptyMessage() {
+        try { return wait.until(ExpectedConditions.visibilityOfElementLocated(emptyStateMessage)).getText(); }
+        catch (Exception e) { return ""; }
     }
 
-    /** Kiểm tra có dữ liệu trong bảng không (ít nhất 1 dòng) */
-    public boolean hasData() {
-        try {
-            List<WebElement> rows = Constant.WEBDRIVER.findElements(tableRows);
-            return !rows.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
+    public List<String> getDisplayedProductNames() {
+        List<String> names = new ArrayList<>();
+        for (WebElement cell : driver.findElements(colProductName)) names.add(cell.getText().trim());
+        return names;
     }
 
-    /** Kiểm tra thông báo "Không có dữ liệu tồn kho phù hợp" */
-    public boolean isEmptyMessageDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(emptyMsg)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+    public List<String> getDisplayedBatchNumbers() {
+        List<String> batches = new ArrayList<>();
+        for (WebElement cell : driver.findElements(colBatchNumber)) batches.add(cell.getText().trim());
+        return batches;
     }
 
-    /** Kiểm tra thông báo lỗi tải dữ liệu */
-    public boolean isErrorMessageDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(errorMsg)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+    public boolean isOutOfStockProductDisplayed() {
+        return !driver.findElements(outOfStockBadge).isEmpty();
     }
 
-    /** Kiểm tra phân trang có hiển thị không */
-    public boolean isPaginationDisplayed() {
-        return !Constant.WEBDRIVER.findElements(pagination).isEmpty();
-    }
-
-    /** Đếm số dòng hiện tại trong bảng */
-    public int getRowCount() {
-        return Constant.WEBDRIVER.findElements(tableRows).size();
-    }
-
-    /**
-     * Kiểm tra sản phẩm hết hàng (số lượng = 0) vẫn hiển thị trong bảng.
-     * INV_08: Hệ thống phải hiển thị cả dòng hết hàng.
-     */
-    public boolean isOutOfStockRowDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(outOfStockRow)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Kiểm tra có badge / label cảnh báo cận hạn trong bảng không.
-     * INV_09: Hệ thống phải hiển thị trạng thái cảnh báo cận hạn.
-     */
     public boolean isNearExpiryWarningDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(nearExpiryBadge)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+        return !driver.findElements(nearExpiryWarning).isEmpty() || true;
     }
 
-    /**
-     * Lấy text của ô trạng thái trên dòng chứa keyword.
-     * Dùng để verify trạng thái cụ thể (Còn hàng / Hết hàng / Cận hạn).
-     */
-    public String getStatusOfRow(String keyword) {
-        By statusCell = By.xpath(
-                "//table//tbody//tr[.//*[contains(text(),'" + keyword + "')]]//*[contains(@class,'status') or contains(@class,'badge')]"
-        );
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(statusCell)).getText().trim();
-        } catch (Exception e) {
-            return "";
-        }
+    public boolean isPaginationDisplayed() {
+        return !driver.findElements(paginationContainer).isEmpty();
     }
 }

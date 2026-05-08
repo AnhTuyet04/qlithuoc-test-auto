@@ -10,10 +10,7 @@ import java.time.Duration;
 
 public class LoginPage {
 
-    // Khoi tao lazy de tranh capture WEBDRIVER=null tai thoi diem new LoginPage()
-    private WebDriverWait getWait() {
-        return new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(15));
-    }
+    private WebDriverWait wait = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(15));
 
     private By txtUsername = By.xpath("//input[@type='text']");
     private By txtPassword = By.xpath("//input[@type='password']");
@@ -21,18 +18,14 @@ public class LoginPage {
     private By errorMsg   = By.xpath("//*[contains(@class,'error') or contains(@class,'alert') or contains(@class,'message') or contains(@class,'toast')]");
 
     // ----------------------------------------------------------------
-    // Dang nhap va cho chuyen trang thanh cong (dung cho test Pass)
+    // Đăng nhập và chờ chuyển trang thành công (dùng cho test Pass)
     // ----------------------------------------------------------------
     public void login(String username, String password) {
         fillForm(username, password);
-        // Cho sidebar/nav xuat hien -- chung to da login thanh cong va trang chinh da load
-        // Khong dung urlContains vi URL co the van la "/" trong khi session chua set xong
-        getWait().until(ExpectedConditions.or(
-                ExpectedConditions.visibilityOfElementLocated(
-                        By.xpath("//aside | //nav[contains(@class,'sidebar')] | //nav[contains(@class,'nav-menu')]")),
+        wait.until(ExpectedConditions.or(
                 ExpectedConditions.urlContains("/products"),
                 ExpectedConditions.urlContains("/dashboard"),
-                ExpectedConditions.urlContains("/invoices")
+                ExpectedConditions.urlToBe(Constant.URL + "/")
         ));
     }
 
@@ -48,7 +41,7 @@ public class LoginPage {
     // Lấy text thông báo lỗi hiển thị trên trang
     // ----------------------------------------------------------------
     public String getErrorMessage() {
-        return getWait().until(ExpectedConditions.visibilityOfElementLocated(errorMsg)).getText();
+        return wait.until(ExpectedConditions.visibilityOfElementLocated(errorMsg)).getText();
     }
 
     // ----------------------------------------------------------------
@@ -57,8 +50,8 @@ public class LoginPage {
     public boolean isShowPasswordIconPresent() {
         return !Constant.WEBDRIVER.findElements(
                 By.xpath("//button[contains(@aria-label,'password') or contains(@class,'toggle') " +
-                        "or .//*[name()='svg'][contains(@class,'eye')] " +
-                        "or .//*[name()='i'][contains(@class,'eye')]]")
+                        "or .//*[name(🙁'svg'][contains(@class,'eye')] " +
+                        "or .//*[name(🙁'i'][contains(@class,'eye')]]")
         ).isEmpty();
     }
 
@@ -76,9 +69,9 @@ public class LoginPage {
     public void clickShowPasswordIcon() {
         By toggleBtn = By.xpath(
                 "//button[contains(@aria-label,'password') or contains(@class,'toggle')" +
-                        " or .//*[name()='svg'][contains(@class,'eye')] " +
-                        " or .//*[name()='i'][contains(@class,'eye')]]");
-        getWait().until(ExpectedConditions.elementToBeClickable(toggleBtn)).click();
+                        " or .//*[name(🙁'svg'][contains(@class,'eye')] " +
+                        " or .//*[name(🙁'i'][contains(@class,'eye')]]");
+        wait.until(ExpectedConditions.elementToBeClickable(toggleBtn)).click();
     }
 
     // ----------------------------------------------------------------
@@ -86,7 +79,7 @@ public class LoginPage {
     // ----------------------------------------------------------------
     public boolean isRedirectedTo(String urlPart) {
         try {
-            getWait().until(ExpectedConditions.urlContains(urlPart));
+            wait.until(ExpectedConditions.urlContains(urlPart));
             return true;
         } catch (Exception e) {
             return false;
@@ -108,14 +101,14 @@ public class LoginPage {
     // Private helper
     // ----------------------------------------------------------------
     private void fillForm(String username, String password) {
-        WebElement user = getWait().until(ExpectedConditions.visibilityOfElementLocated(txtUsername));
+        WebElement user = wait.until(ExpectedConditions.visibilityOfElementLocated(txtUsername));
         user.clear();
         user.sendKeys(username);
 
-        WebElement pass = getWait().until(ExpectedConditions.visibilityOfElementLocated(txtPassword));
+        WebElement pass = wait.until(ExpectedConditions.visibilityOfElementLocated(txtPassword));
         pass.clear();
         pass.sendKeys(password);
 
-        getWait().until(ExpectedConditions.elementToBeClickable(btnLogin)).click();
+        wait.until(ExpectedConditions.elementToBeClickable(btnLogin)).click();
     }
 }

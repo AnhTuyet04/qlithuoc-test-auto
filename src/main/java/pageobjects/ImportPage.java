@@ -1,239 +1,170 @@
 package pageobjects;
 
-import common.Constant;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class ImportPage {
+    private WebDriver driver;
+    private WebDriverWait wait;
 
-    private WebDriverWait wait = new WebDriverWait(Constant.WEBDRIVER, Duration.ofSeconds(15));
+    private By menuImport = By.xpath("//nav//a[contains(@href, '/imports')]");
+    private By btnCreateImport = By.xpath("//button[contains(text(), 'Tạo phiếu nhập')]");
 
-    // ── Danh sách phiếu nhập ────────────────────────────────────────
-    private By btnCreateImport  = By.xpath("//button[contains(.,'Tạo phiếu nhập') or contains(.,'Tạo phiếu')]");
+    private By searchBox = By.cssSelector("input[placeholder*='Tìm kiếm sản phẩm']");
+    private By searchResultItems = By.cssSelector(".product-search-item, .dropdown-item, li.item, [role='option'], li, .search-result");
+    private By itemCard = By.className("import-item-card");
 
-    // ── Form phiếu nhập ─────────────────────────────────────────────
-    private By searchProduct    = By.xpath("//input[contains(@placeholder,'Tìm') or contains(@placeholder,'tìm') or contains(@placeholder,'sản phẩm')]");
-    private By btnAddRow        = By.xpath("//button[contains(.,'Thêm') or contains(.,'thêm sản phẩm')]");
+    private By txtQuantity = By.xpath("//label[text()='Số lượng']/following-sibling::input");
+    private By txtImportPrice = By.xpath("//label[text()='Giá nhập']/following-sibling::input");
+    private By txtBatchNumber = By.xpath("//input[@placeholder='Nhập số lô']");
+    private By txtExpiryDate = By.cssSelector("input[type='date']");
 
-    // ── Các trường trong dòng sản phẩm (lấy theo index dòng cuối) ──
-    private By allBatchInputs   = By.xpath("//input[@name[contains(.,'batch') or contains(.,'solo') or contains(.,'lo')] or @placeholder[contains(.,'lô') or contains(.,'Lô') or contains(.,'số lô')]]");
-    private By allExpiryInputs  = By.xpath("//input[@type='date' or @name[contains(.,'expiry') or contains(.,'hansd') or contains(.,'hsd')]]");
-    private By allQtyInputs     = By.xpath("//input[@name[contains(.,'qty') or contains(.,'quantity') or contains(.,'soluong')] or @placeholder[contains(.,'số lượng') or contains(.,'Số lượng')]]");
-    private By allPriceInputs   = By.xpath("//input[@name[contains(.,'price') or contains(.,'gianhap')] or @placeholder[contains(.,'giá nhập') or contains(.,'Giá nhập')]]");
+    private By btnComplete = By.xpath("//button[contains(text(), 'Hoàn tất') or contains(@class, 'btn-primary-full')]");
+    private By btnSaveDraft = By.xpath("//button[contains(text(), 'Lưu nháp')]");
 
-    // ── Nút hành động ───────────────────────────────────────────────
-    private By btnComplete      = By.xpath("//button[contains(.,'Hoàn tất') or contains(.,'hoàn tất')]");
-    private By btnSaveDraft     = By.xpath("//button[contains(.,'Lưu nháp') or contains(.,'lưu nháp')]");
+    private By toastMessage = By.cssSelector("[data-sonner-toast], .toast-message, .alert, .error-message");
+    private By summaryTotal = By.xpath("//div[contains(text(), 'Tổng giá trị')]/following-sibling::div | //strong[contains(text(), 'đ')]");
+    private By statusBadge = By.cssSelector("table tbody tr:first-child .status-badge, table tbody tr:first-child td:nth-last-child(2)");
 
-    // ── Thông báo ───────────────────────────────────────────────────
-    private By toastAny         = By.xpath("//*[contains(@class,'toast') or contains(@class,'alert') or contains(@class,'message') or contains(@class,'notification') or contains(@class,'Toastify')]");
-    private By toastSuccess     = By.xpath("//*[contains(text(),'thành công') or contains(text(),'Thành công')]");
-    private By toastFail        = By.xpath("//*[contains(text(),'thất bại') or contains(text(),'Thất bại') or contains(text(),'không thể') or contains(text(),'Không thể')]");
-    private By validationMsg    = By.xpath("//*[contains(@class,'error') or contains(@class,'invalid') or contains(text(),'Vui lòng') or contains(text(),'phải lớn hơn')]");
-
-    // ── Tổng tiền ───────────────────────────────────────────────────
-    private By totalAmount      = By.xpath("//*[contains(@class,'total') or contains(text(),'Tổng tiền') or contains(text(),'tổng tiền')]/following-sibling::* | //*[@id='total'] | //*[contains(@class,'total-amount')]");
-
-    // ================================================================
-    // Navigation
-    // ================================================================
-
-    public void openImportPage() {
-        Constant.WEBDRIVER.get(Constant.URL + "/imports");
-        wait.until(ExpectedConditions.or(
-                ExpectedConditions.visibilityOfElementLocated(btnCreateImport),
-                ExpectedConditions.urlContains("/imports")
-        ));
+    public ImportPage(WebDriver driver) {
+        this.driver = driver;
+        this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
     }
 
-    public void clickCreateImport() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnCreateImport)).click();
-        wait.until(ExpectedConditions.or(
-                ExpectedConditions.visibilityOfElementLocated(searchProduct),
-                ExpectedConditions.visibilityOfElementLocated(btnAddRow)
-        ));
-    }
-
-    // ================================================================
-    // Thêm sản phẩm vào phiếu nhập
-    // ================================================================
-
-    /**
-     * Tìm và chọn sản phẩm từ ô tìm kiếm.
-     */
-    public void searchAndSelectProduct(String productName) {
-        WebElement input = wait.until(ExpectedConditions.visibilityOfElementLocated(searchProduct));
-        input.clear();
-        input.sendKeys(productName);
-
-        By option = By.xpath("//*[contains(text(),'" + productName + "')]");
-        wait.until(ExpectedConditions.elementToBeClickable(option)).click();
-    }
-
-    /**
-     * Điền thông tin dòng sản phẩm trong phiếu nhập.
-     * Truyền null để bỏ trống trường đó (test case kiểm tra validation).
-     *
-     * @param batchNo   Số lô (null = bỏ trống)
-     * @param expiryDate Hạn sử dụng dạng yyyy-MM-dd (null = bỏ trống, "expired" = ngày quá khứ)
-     * @param quantity  Số lượng (null = bỏ trống)
-     * @param price     Giá nhập (null = bỏ trống)
-     */
-    public void fillImportRow(String batchNo, String expiryDate, String quantity, String price) {
-        // Lấy dòng cuối cùng (dòng vừa thêm)
-        if (batchNo != null) {
-            List<WebElement> batches = wait.until(
-                    ExpectedConditions.presenceOfAllElementsLocatedBy(allBatchInputs));
-            WebElement field = batches.get(batches.size() - 1);
-            field.clear();
-            field.sendKeys(batchNo);
+    private void clickJS(By locator) {
+        try {
+            WebElement element = wait.until(ExpectedConditions.presenceOfElementLocated(locator));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", element);
+        } catch (Exception e) {
+            System.out.println("Lỗi click JS: " + e.getMessage());
         }
+    }
 
-        if (expiryDate != null) {
-            List<WebElement> expiries = Constant.WEBDRIVER.findElements(allExpiryInputs);
-            if (!expiries.isEmpty()) {
-                WebElement field = expiries.get(expiries.size() - 1);
-                String dateValue;
-                if ("expired".equals(expiryDate)) {
-                    // Ngày đã hết hạn: hôm qua
-                    dateValue = LocalDate.now().minusDays(1)
-                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                } else if ("future".equals(expiryDate)) {
-                    // Ngày hợp lệ: 1 năm sau
-                    dateValue = LocalDate.now().plusYears(1)
-                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    public void navigateToCreateImport() {
+        try {
+            Thread.sleep(1000);
+            clickJS(menuImport);
+            Thread.sleep(1500);
+            clickJS(btnCreateImport);
+            Thread.sleep(1500);
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public void selectProduct(String productName) {
+        try {
+            WebElement input = wait.until(ExpectedConditions.presenceOfElementLocated(searchBox));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].focus();", input);
+            input.clear();
+            input.sendKeys(productName);
+
+            Thread.sleep(2000);
+
+            List<WebElement> results = driver.findElements(searchResultItems);
+            if (!results.isEmpty()) {
+                ((JavascriptExecutor) driver).executeScript("arguments[0].click();", results.get(0));
+            } else {
+                input.sendKeys(Keys.ARROW_DOWN);
+                Thread.sleep(500);
+                input.sendKeys(Keys.ENTER);
+            }
+
+            wait.until(ExpectedConditions.presenceOfElementLocated(itemCard));
+            Thread.sleep(1000);
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public void fillImportItemDetails(String batch, String expiry, String qty, String price) {
+        try {
+            // 1. CHỜ 1.5 GIÂY ĐỂ WEB LOAD XONG DỮ LIỆU AUTO-FILL (Như giá nhập mặc định 12017)
+            Thread.sleep(1500);
+
+            if (batch != null) {
+                WebElement b = wait.until(ExpectedConditions.presenceOfElementLocated(txtBatchNumber));
+                b.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE);
+                if (!batch.isEmpty()) b.sendKeys(batch);
+            }
+
+            if (expiry != null) {
+                WebElement e = wait.until(ExpectedConditions.presenceOfElementLocated(txtExpiryDate));
+                if (!expiry.isEmpty()) {
+                    String[] parts = expiry.split("/");
+                    String isoDate = parts[2] + "-" + parts[1] + "-" + parts[0];
+
+                    String reactJS = "var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;" +
+                            "setter.call(arguments[0], arguments[1]);" +
+                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));";
+                    ((JavascriptExecutor) driver).executeScript(reactJS, e, isoDate);
                 } else {
-                    dateValue = expiryDate;
+                    e.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE);
                 }
-                // Dùng JS để set value cho input type=date
-                ((JavascriptExecutor) Constant.WEBDRIVER)
-                        .executeScript("arguments[0].value='" + dateValue + "';", field);
+                e.sendKeys(Keys.ESCAPE);
+                e.sendKeys(Keys.TAB);
             }
-        }
 
-        if (quantity != null) {
-            List<WebElement> qtys = Constant.WEBDRIVER.findElements(allQtyInputs);
-            if (!qtys.isEmpty()) {
-                WebElement field = qtys.get(qtys.size() - 1);
-                field.clear();
-                field.sendKeys(quantity);
+            if (qty != null) {
+                WebElement q = wait.until(ExpectedConditions.presenceOfElementLocated(txtQuantity));
+                // Kết hợp 2 cách xóa để đảm bảo sạch sẽ dữ liệu cũ
+                ((JavascriptExecutor) driver).executeScript("arguments[0].value = '';", q);
+                q.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE);
+                if (!qty.isEmpty()) q.sendKeys(qty);
             }
-        }
 
-        if (price != null) {
-            List<WebElement> prices = Constant.WEBDRIVER.findElements(allPriceInputs);
-            if (!prices.isEmpty()) {
-                WebElement field = prices.get(prices.size() - 1);
-                field.clear();
-                field.sendKeys(price);
+            if (price != null) {
+                WebElement p = wait.until(ExpectedConditions.presenceOfElementLocated(txtImportPrice));
+                // Kết hợp 2 cách xóa để quét sạch cái giá 12017 đi
+                ((JavascriptExecutor) driver).executeScript("arguments[0].value = '';", p);
+                p.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE);
+                if (!price.isEmpty()) {
+                    p.sendKeys(price);
+                }
             }
-        }
+
+            // 2. Click ra khoảng trắng và đợi hệ thống tính toán lại Thành tiền mới nhất
+            clickJS(By.tagName("body"));
+            Thread.sleep(1500);
+
+        } catch (Exception e) { e.printStackTrace(); }
     }
-
-    // ================================================================
-    // Hành động
-    // ================================================================
 
     public void clickComplete() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnComplete)).click();
+        clickJS(btnComplete);
     }
 
     public void clickSaveDraft() {
-        wait.until(ExpectedConditions.elementToBeClickable(btnSaveDraft)).click();
+        clickJS(btnSaveDraft);
     }
 
-    // ================================================================
-    // Kiểm tra kết quả
-    // ================================================================
-
-    public String getToastMessage() {
-        return wait.until(ExpectedConditions.visibilityOfElementLocated(toastAny)).getText();
-    }
-
-    public boolean isSuccessMessageDisplayed() {
+    public String getAllErrorMessages() {
+        StringBuilder errors = new StringBuilder();
         try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(toastSuccess)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+            for(WebElement el : driver.findElements(toastMessage)) errors.append(el.getText()).append(" | ");
+            for(WebElement el : driver.findElements(By.xpath("//*[contains(@class, 'error') or contains(@class, 'text-danger')]"))) errors.append(el.getText()).append(" | ");
+            for(WebElement el : driver.findElements(By.cssSelector("input:invalid"))) errors.append(el.getAttribute("validationMessage")).append(" | ");
+        } catch (Exception e) {}
+        return errors.toString().toLowerCase();
     }
 
-    public boolean isFailMessageDisplayed() {
+    public long getTotalPrice() {
         try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(toastFail)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
+            WebElement totalEl = wait.until(ExpectedConditions.presenceOfElementLocated(summaryTotal));
+            String cleaned = totalEl.getText().replaceAll("[^\\d]", "");
+            return cleaned.isEmpty() ? 0L : Long.parseLong(cleaned);
+        } catch (Exception e) { return 0L; }
     }
 
-    /**
-     * Lấy text thông báo validation (lỗi field cụ thể).
-     * Dùng cho IMP_04→IMP_09.
-     */
-    public String getValidationMessage() {
+    public String getFirstRowStatus() {
         try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(validationMsg)).getText();
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    public boolean isValidationMessageDisplayed() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(validationMsg)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Lấy text tổng tiền hiển thị trên form.
-     */
-    public String getTotalAmountText() {
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(totalAmount)).getText();
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    /**
-     * Tính tổng tiền kỳ vọng = số lượng * giá nhập.
-     */
-    public long calculateExpectedTotal(int quantity, long price) {
-        return (long) quantity * price;
-    }
-
-    /**
-     * Kiểm tra phiếu nhập vừa tạo có xuất hiện trong danh sách không.
-     */
-    public boolean isImportInList() {
-        By firstRow = By.xpath("//table//tbody//tr[1]");
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(firstRow)).isDisplayed();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * Kiểm tra trạng thái phiếu nhập đầu tiên trong danh sách.
-     * Dùng cho IMP_02 (Lưu nháp → trạng thái "Nháp").
-     */
-    public String getFirstImportStatus() {
-        By statusCell = By.xpath("//table//tbody//tr[1]//*[contains(@class,'status') or contains(@class,'badge')]");
-        try {
-            return wait.until(ExpectedConditions.visibilityOfElementLocated(statusCell)).getText().trim();
-        } catch (Exception e) {
-            return "";
-        }
+            WebElement status = wait.until(ExpectedConditions.presenceOfElementLocated(statusBadge));
+            return status.getText();
+        } catch (Exception e) { return ""; }
     }
 }
